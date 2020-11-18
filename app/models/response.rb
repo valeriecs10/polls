@@ -15,6 +15,28 @@ class Response < ApplicationRecord
     through: :answer_choice,
     source: :question
 
+  def better_sibling_responses
+    binds = { answer_choice_id: self.answer_choice_id, id: self.id }
+    Response.find_by_sql([<<-SQL, binds])
+      SELECT
+        responses.*
+      FROM (
+        SELECT
+          questions.*
+        FROM
+          questions
+          JOIN answer_choices ON answer_choices.question_id = questions.id
+        WHERE
+          answer_choices.id = :answer_choice_id
+      ) AS questions
+      JOIN answer_choices ON answer_choices.question_id = questions.id
+      JOIN responses ON responses.answer_choice_id = answer_choices.id
+      WHERE 
+        (:id IS NULL) OR (responses.id != :id)
+    SQL
+  end
+
+
   def sibling_responses
     self.id.nil? ? self.question.responses : 
       self.question.responses.where.not('responses.id = ?', self.id)
